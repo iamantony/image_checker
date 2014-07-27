@@ -6,16 +6,31 @@ Multi-thread python app for validating images.
 Usage
 =======================
 
-    $ image_checker PATH_TO_FOLDER FOLDER_FOR_INVALID_IMAGES
+    $python image_checker.py [-h] [-d | -inf INVALID_FOLDER] folder
 
-* PATH_TO_FOLDER - absolute path to the folder with images that you want to check
-* FOLDER_FOR_INVALID_IMAGES - absolute path to folder where invalid images should be moved.
-Folder will be created if it's not exist.
+* folder - absolute path to the folder with images that you want to check
+* -h - help message with useful information about arguments
+* -d - if it is given, then all invalid images will be deleted
+* -inf - absolute path to folder where invalid images should be moved. Folder will be created if it's not exist.
 
 Examples
 =======================
 
-    $ python image_checker.py /home/my_user_name/images /home/my_user_name/images/invalid_images
+Find invalid images and print their paths:
+
+    $ python image_checker.py /home/my_user_name/images -d
+
+Delete all invalid images:
+
+    $ python image_checker.py /home/my_user_name/images -d
+    
+Move all invalid images to folder "invalid_images":
+
+    $ python image_checker.py /home/my_user_name/images -inf /home/my_user_name/images/invalid_images
+    
+Show help:
+
+    $ python image_checker.py -h
     
 Requirements
 =======================
