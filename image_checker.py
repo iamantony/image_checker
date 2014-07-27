@@ -5,7 +5,8 @@ import argparse
 import os
 import shutil
 import multiprocessing
-from PIL import Image
+import imghdr
+from PIL import Image, ImageStat
 
 
 def get_local_time_string():
@@ -159,7 +160,13 @@ def check_images(t_paths, t_func, t_extra_args):
         try:
             image = Image.open(img_path)
             image.verify()
-        except Exception:
+            image.close()
+
+            if not imghdr.what(img_path):
+                raise Exception
+
+        except Exception as err:
+            print(err)
             if t_extra_args is None:
                 t_func(img_path)
             else:
