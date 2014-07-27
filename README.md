@@ -1,7 +1,7 @@
 image_checker
 ========================
 
-Multi-thread python app for validating images.
+Multi-thread python app for validating images. Check if image can be opened and contains valid information.
 
 Usage
 =======================
