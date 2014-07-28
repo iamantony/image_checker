@@ -135,14 +135,12 @@ def get_images_paths(t_folder):
     if not os.path.isdir(t_folder):
         return list()
 
-    image_extensions = ["jpg", "jpeg", "bmp", "png", "gif", "tiff"]
+    image_extensions = ("jpg", "jpeg", "bmp", "png", "gif", "tiff")
     images = list()
     entries = os.listdir(t_folder)
     for entry in entries:
         file_path = os.path.join(t_folder, entry)
-        file_parts = str.split(file_path, '.')
-        extension = file_parts[-1:][0]
-        extension = extension.lower()
+        extension = get_extension(file_path)
         if os.path.isfile(file_path) and extension in image_extensions:
             images.append(file_path)
 
@@ -158,20 +156,54 @@ def check_images(t_paths, t_func, t_extra_args):
 
     for img_path in t_paths:
         try:
+            # Try to open image
             image = Image.open(img_path)
             image.verify()
             image.close()
 
-            if not imghdr.what(img_path):
-                raise Exception
+            # Try to check extension and actual image type
+            extension = get_extension(img_path)
+            what_extension = imghdr.what(img_path)
+            if not compare_extensions(extension, what_extension):
+                raise Exception("Extension doesn't match image data")
 
         except Exception as err:
-            print(err)
+            # print(err)
             if t_extra_args is None:
                 t_func(img_path)
             else:
                 args = img_path, t_extra_args
                 t_func(*args)
+
+
+def get_extension(t_path):
+    """ Get extension of the file
+    :param t_path: path or name of the file
+    :return: string with extension of the file or empty string if we failed to get it
+    """
+
+    path_parts = str.split(t_path, '.')
+    extension = path_parts[-1:][0]
+    extension = extension.lower()
+    return extension
+
+
+def compare_extensions(t_first, t_second):
+    """ Compare extensions
+    :param t_first: string with the name of the extension
+    :param t_second: string with the name of the extension
+    :return: boolean value. True if the extensions are same
+    """
+
+    jpeg_extensions = ("jpg", "jpeg")
+    first = t_first.lower()
+    second = t_second.lower()
+    if first != second:
+        if first in jpeg_extensions and second in jpeg_extensions:
+            return True
+        return False
+
+    return True
 
 
 def print_invalid_img_path(t_path):
