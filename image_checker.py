@@ -6,7 +6,6 @@ import os
 import shutil
 import multiprocessing
 import imghdr
-from PIL import Image, ImageStat
 
 
 def get_local_time_string():
@@ -27,16 +26,19 @@ def parse_arguments():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-d", "--delete", action="store_true", help="delete invalid images")
     group.add_argument("-inf", "--invalid_folder", help="absolute path to the folder for invalid images")
+    parser.add_argument("-npil", "--no_pillow", action="store_true",
+                        help="don't use Pillow library. Warning: check quality may decline")
 
     args = parser.parse_args()
-    return [args.folder, args.delete, args.invalid_folder]
+    return [args.folder, args.delete, args.invalid_folder, args.no_pillow]
 
 
-def check_arguments(t_folder, t_delete, t_inv_folder):
+def check_arguments(t_folder, t_delete, t_inv_folder, t_no_pillow):
     """ Check arguments
     :param t_folder: string with absolute path to the folder with images to check
     :param t_delete: boolean value. If True, delete all invalid images
     :param t_inv_folder: string with absolute path to the folder for invalid images
+    :param t_no_pillow: boolean value. If True, don't use Pillow library
     :return boolean value. True if arguments are OK.
     """
 
@@ -83,29 +85,35 @@ def check_folder_path(t_path):
     return False
 
 
-def start_check(t_folder, t_delete, t_inv_folder):
+def start_check(t_folder, t_delete, t_inv_folder, t_no_pillow):
     """ Check images
     :param t_folder: string with absolute path to the folder with images to check
     :param t_delete: boolean value. If True, delete all invalid images
     :param t_inv_folder: string with absolute path to the folder for invalid images
+    :param t_no_pillow: boolean value. If True, don't use Pillow library
     """
 
     images = get_images_paths(t_folder)
     cores_num = multiprocessing.cpu_count()
     img_chunks = list_split(images, cores_num)
 
-    function = print_invalid_img_path
+    result_function = print_invalid_img_path
     extra_args = None
     if t_delete is True:
-        function = delete_invalid_image
+        result_function = delete_invalid_image
     else:
         if t_inv_folder is not None:
-            function = move_invalid_image
+            result_function = move_invalid_image
             extra_args = t_inv_folder
+
+    check_func = check_img
+    if t_no_pillow:
+        check_func = check_img_no_pil
 
     jobs = list()
     for i in range(cores_num):
-        thread = multiprocessing.Process(target=check_images, args=(next(img_chunks), function, extra_args))
+        thread = multiprocessing.Process(target=check_images,
+                                         args=(next(img_chunks), check_func, result_function, extra_args))
         jobs.append(thread)
         thread.start()
 
@@ -147,33 +155,58 @@ def get_images_paths(t_folder):
     return images
 
 
-def check_images(t_paths, t_func, t_extra_args):
+def check_images(t_paths, t_check_func, t_res_func, t_extra_args):
     """ Check images if they are valid
     :param t_paths: list of path to the images
-    :param t_func: function to call if image is not valid
+    :param t_check_func: check function
+    :param t_res_func: function to call if image is not valid
     :param t_extra_args: arguments for t_func
     """
 
     for img_path in t_paths:
-        try:
-            # Try to open image
-            image = Image.open(img_path)
-            image.verify()
-            image.close()
-
-            # Try to check extension and actual image type
-            extension = get_extension(img_path)
-            what_extension = imghdr.what(img_path)
-            if not compare_extensions(extension, what_extension):
-                raise Exception("Extension doesn't match image data")
-
-        except Exception as err:
-            # print(err)
+        if not t_check_func(img_path):
             if t_extra_args is None:
-                t_func(img_path)
+                t_res_func(img_path)
             else:
                 args = img_path, t_extra_args
-                t_func(*args)
+                t_res_func(*args)
+
+
+def check_img(t_path):
+    """ Check image if it valid
+    :param t_path: path to image
+    :return: boolean value: True if image isvalid
+    """
+
+    if not check_img_no_pil(t_path):
+        return False
+
+    # Try to open image with tools of Pillow
+    try:
+        from PIL import Image, ImageStat
+        image = Image.open(t_path)
+        image.verify()
+        image.close()
+    except Exception as err:
+        # print(err)
+        return False
+
+    return True
+
+
+def check_img_no_pil(t_path):
+    """ Check image if it valid (don't use Pillow)
+    :param t_path: path to image
+    :return: boolean value: True if image isvalid
+    """
+
+    # Try to check extension and actual image type
+    extension = get_extension(t_path)
+    what_extension = imghdr.what(t_path)
+    if not compare_extensions(extension, what_extension):
+        return False
+
+    return True
 
 
 def get_extension(t_path):
@@ -194,6 +227,9 @@ def compare_extensions(t_first, t_second):
     :param t_second: string with the name of the extension
     :return: boolean value. True if the extensions are same
     """
+
+    if t_first is None or t_second is None:
+        return False
 
     jpeg_extensions = ("jpg", "jpeg")
     first = t_first.lower()
@@ -259,11 +295,11 @@ def move_invalid_image(t_img_path, t_folder):
 
 
 if __name__ == '__main__':
-    print(get_local_time_string() + " Start")
     arguments = parse_arguments()
-    isOk = check_arguments(arguments[0], arguments[1], arguments[2])
+    isOk = check_arguments(arguments[0], arguments[1], arguments[2], arguments[3])
     if isOk is True:
-        start_check(arguments[0], arguments[1], arguments[2])
+        print(get_local_time_string() + " Start")
+        start_check(arguments[0], arguments[1], arguments[2], arguments[3])
         print(get_local_time_string() + " Done")
     else:
         print(get_local_time_string() + " Invalid arguments. Try again!")
